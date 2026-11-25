@@ -1,6 +1,6 @@
 # 🤖 J.A.R.V.I.S. – Persönlicher KI-Assistent für macOS
 
-*Just A Rather Very Intelligent System* – ein Sprachassistent im Stil von Tony Starks Jarvis, der mit der **Claude API** denkt und den Mac steuert.
+*Just A Rather Very Intelligent System* – ein Sprachassistent im Stil von Tony Starks Jarvis, der den Mac steuert. Als Gehirn dient wahlweise **Ollama** (gratis, lokal, offline) oder die **Claude API**.
 
 > «Jarvis, mach die Musik lauter und sag mir, wie das Wetter morgen wird.»
 
@@ -11,7 +11,8 @@
 | 🎙️ **Sprache** | Wake-Word «Jarvis», Spracherkennung (Schweizerdeutsch/Deutsch), Antworten per Sprachausgabe |
 | ⌨️ **Text** | Chat im Terminal, falls kein Mikrofon gewünscht |
 | 💻 **Mac steuern** | Apps öffnen/beenden, Lautstärke, Spotify/Apple Music, Bildschirm sperren, Akkustand |
-| 🌐 **Web & Infos** | Websuche (aktuelle News, Resultate), Wetter (Open-Meteo), Websites öffnen, Datum/Uhrzeit |
+| 🧠 **Zwei Gehirne** | Ollama (kostenlos, privat, offline) oder Claude API (stärker, mit Websuche) |
+| 🌐 **Web & Infos** | Websuche (nur Claude), Wetter (Open-Meteo), Websites öffnen, Datum/Uhrzeit |
 | ⏰ **Erinnerungen** | Timer mit Mitteilung und Sprachausgabe, Einträge in der Apple-Erinnerungen-App |
 | 📝 **Notizen** | Notizen speichern, auflisten, löschen |
 | 🧠 **Gedächtnis** | Merkt sich Fakten über dich und den Gesprächsverlauf – auch nach einem Neustart |
@@ -23,7 +24,7 @@ Mikrofon ──► Spracherkennung ──► Wake-Word-Filter
                                        │
                                        ▼
                             ┌─────────────────────┐
-     Gedächtnis (JSON) ◄──► │  Brain (Claude API) │ ◄──► Websuche
+     Gedächtnis (JSON) ◄──► │ Brain: Ollama/Claude│ ◄──► Websuche
                             └─────────┬───────────┘
                                       │ Tool Use
                                       ▼
@@ -35,7 +36,7 @@ Mikrofon ──► Spracherkennung ──► Wake-Word-Filter
 
 | Datei | Aufgabe |
 |---|---|
-| `jarvis/brain.py` | Gespräch mit Claude, Tool-Use-Schleife, System-Prompt mit Persönlichkeit |
+| `jarvis/brain.py` | Ollama- und Claude-Gehirn, Tool-Use-Schleife, System-Prompt mit Persönlichkeit |
 | `jarvis/tools.py` | Alle Werkzeuge und ihre JSON-Schemas |
 | `jarvis/memory.py` | Fakten, Notizen und Verlauf in `~/.jarvis/` |
 | `jarvis/voice.py` | Spracherkennung und Sprachausgabe |
@@ -43,16 +44,27 @@ Mikrofon ──► Spracherkennung ──► Wake-Word-Filter
 
 ## Installation
 
-Voraussetzungen: macOS, Python 3.10+, [Homebrew](https://brew.sh), ein [Anthropic API-Key](https://console.anthropic.com/settings/keys).
+Voraussetzungen: macOS, Python 3.10+, [Homebrew](https://brew.sh) und [Ollama](https://ollama.com/download/mac) (gratis).
 
 ```bash
 git clone https://github.com/dalipivaldrin/jarvis.git
 cd jarvis
 bash setup.sh
-open -e .env          # API-Key eintragen
-./jarvis.sh           # Sprachmodus
-./jarvis.sh --text    # Textmodus
 ```
+
+Dann starten – im Textmodus oder mit Sprache:
+
+```bash
+./jarvis.sh --text
+./jarvis.sh
+```
+
+Namen und Wohnort passt du in der Datei `.env` an (`open -e .env`).
+
+### Optional: Claude statt Ollama
+
+Für stärkere Antworten und Websuche in `.env` setzen: `JARVIS_PROVIDER=claude` und einen
+[Anthropic API-Key](https://console.anthropic.com/settings/keys) (Guthaben nötig) bei `ANTHROPIC_API_KEY` eintragen.
 
 Beim ersten Start fragt macOS nach dem Mikrofonzugriff für das Terminal – bitte erlauben.
 Für die Musik- und Erinnerungen-Steuerung fragt macOS ebenfalls einmal nach Erlaubnis.
@@ -73,14 +85,16 @@ Für die Musik- und Erinnerungen-Steuerung fragt macOS ebenfalls einmal nach Erl
 
 | Variable | Standard | Beschreibung |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | – | Dein API-Key (Pflicht) |
 | `JARVIS_USER_NAME` | `Sir` | Wie Jarvis dich anspricht |
 | `JARVIS_CITY` | `Zürich` | Ort für das Wetter |
+| `JARVIS_PROVIDER` | `ollama` | `ollama` (gratis) oder `claude` |
+| `JARVIS_OLLAMA_MODEL` | `qwen3:8b` | Ollama-Modell (muss Tool-Calling können) |
+| `ANTHROPIC_API_KEY` | – | Nur für Claude |
 | `JARVIS_MODEL` | `claude-sonnet-5-5` | Claude-Modell |
 | `JARVIS_LANGUAGE` | `de-CH` | Sprache der Spracherkennung |
 | `JARVIS_VOICE` | `Anna` | macOS-Stimme (Liste: `say -v '?'`) |
 | `JARVIS_WAKE_WORD` | `jarvis` | Aktivierungswort |
-| `JARVIS_WEB_SEARCH` | `true` | Websuche über die Claude API |
+| `JARVIS_WEB_SEARCH` | `true` | Websuche (nur Claude) |
 
 ## Tests
 
@@ -95,11 +109,11 @@ python -m unittest discover tests
 2. Schema mit `_tool(...)` in `TOOL_SCHEMAS` eintragen
 3. Funktion in `_HANDLERS` registrieren
 
-Claude entscheidet danach selbst, wann das Werkzeug benutzt wird.
+Das Gehirn entscheidet danach selbst, wann das Werkzeug benutzt wird.
 
 ## Datenschutz
 
-Gedächtnis und Notizen bleiben lokal in `~/.jarvis/`. Gesprochene Befehle werden zur Erkennung an Google Speech und der Text an die Claude API geschickt. Der API-Key steht in `.env` und wird nie hochgeladen.
+Gedächtnis und Notizen bleiben lokal in `~/.jarvis/`. Mit Ollama bleibt das Denken komplett auf deinem Mac. Gesprochene Befehle werden zur Erkennung an Google Speech geschickt; mit Claude geht der Text zusätzlich an die Claude API. Die `.env` mit Schlüsseln wird nie hochgeladen.
 
 ---
 Gebaut von [Valdrin Dalipi](https://github.com/dalipivaldrin) · MIT-Lizenz

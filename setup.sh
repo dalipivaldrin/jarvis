@@ -19,7 +19,14 @@ pip install -r requirements.txt
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo "📝 .env erstellt – trage jetzt deinen ANTHROPIC_API_KEY ein: open -e .env"
+  echo "📝 .env erstellt – Namen und Wohnort anpassen mit: open -e .env"
+fi
+
+if command -v ollama >/dev/null 2>&1; then
+  echo "🧠 Lade das KI-Modell für Ollama (einmalig ca. 5 GB)..."
+  ollama pull qwen3:8b || echo "⚠️  Ollama-App öffnen und dann 'ollama pull qwen3:8b' ausführen."
+else
+  echo "ℹ️  Für die Gratis-Variante Ollama installieren: https://ollama.com/download/mac"
 fi
 
 chmod +x jarvis.sh
