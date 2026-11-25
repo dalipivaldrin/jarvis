@@ -8,6 +8,27 @@ from . import config, memory
 from .tools import TOOL_SCHEMAS, get_datetime, run_tool
 
 MAX_STEPS = 10
+_SENTENCE_END = re.compile(r"[.!?…:;](?=\s)|\n")
+
+
+def _strip_think(text: str) -> str:
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
+    return text.split("<think>")[0]  # unvollständiger Denk-Block → noch nichts sprechen
+
+
+def _emit_sentences(content: str, spoken: int, on_sentence, final: bool) -> int:
+    """Gibt alle neuen, abgeschlossenen Sätze aus. Rückgabe: wie viele Zeichen bereits gesprochen sind."""
+    clean = _strip_think(content)
+    rest = clean[spoken:]
+    last_end = 0
+    for m in _SENTENCE_END.finditer(rest):
+        last_end = m.end()
+    if final:
+        last_end = len(rest)
+    chunk = rest[:last_end].strip()
+    if chunk and len(chunk) > 1:
+        on_sentence(chunk)
+    return spoken + last_end
 
 
 class JarvisError(Exception):
@@ -18,6 +39,7 @@ class Brain:
     """Gemeinsame Logik: Persönlichkeit, Gedächtnis, Verlauf."""
 
     web_search = False
+    streams = False  # kann Sätze schon während der Generierung ausgeben
 
     def warmup(self):
         """Optional: Modell vorladen (nur bei Ollama nötig)."""
@@ -46,7 +68,7 @@ Regeln:
 - Sprich ihn mit «{config.USER_NAME}» an, aber nicht in jedem Satz.
 
 Wohnort: {config.CITY}
-Jetzt: {get_datetime()}
+(Datum und Uhrzeit stehen in eckigen Klammern vor seiner Nachricht.)
 
 Was du über {config.USER_NAME} weisst:
 {facts_text}"""
@@ -59,14 +81,16 @@ Was du über {config.USER_NAME} weisst:
             return "Gesprächsverlauf wird gelöscht.", True
         return run_tool(name, args), False
 
-    def _run(self, messages, on_tool):  # pragma: no cover – in Unterklassen
+    def _run(self, messages, on_tool, on_sentence=None):  # pragma: no cover – in Unterklassen
         raise NotImplementedError
 
-    def ask(self, text: str, on_tool=None) -> str:
+    def ask(self, text: str, on_tool=None, on_sentence=None) -> str:
+        """on_sentence(satz) wird – falls unterstützt – für jeden fertigen Satz sofort aufgerufen."""
         if not text.strip():
             return ""
-        messages = [dict(m) for m in self.history] + [{"role": "user", "content": text}]
-        answer, reset = self._run(messages, on_tool)
+        now = {"role": "user", "content": f"[{get_datetime()}] {text}"}
+        messages = [dict(m) for m in self.history] + [now]
+        answer, reset = self._run(messages, on_tool, on_sentence)
         answer = answer.strip() or "Erledigt."
 
         if reset:
@@ -84,9 +108,12 @@ Was du über {config.USER_NAME} weisst:
 class OllamaBrain(Brain):
     """Lokales Modell über Ollama – kostenlos, offline, kein API-Key."""
 
-    def __init__(self, post=None):
+    def __init__(self, post=None, post_stream=None):
         super().__init__()
         self.post = post or self._http_post
+        # Streaming nur mit echtem Server oder explizit übergebener Test-Funktion
+        self.post_stream = post_stream or (None if post else self._http_stream)
+        self.streams = self.post_stream is not None
         self.think_supported = True
         self.tools = [{"type": "function",
                        "function": {"name": t["name"], "description": t["description"],
@@ -111,14 +138,63 @@ class OllamaBrain(Brain):
         except urllib.error.URLError:
             raise JarvisError("Ollama läuft nicht. Bitte die Ollama-App öffnen.")
 
-    def _chat(self, messages):
+    @staticmethod
+    def _http_stream(path, body):
+        """Liefert die Antwort Stück für Stück (eine JSON-Zeile pro Token-Gruppe)."""
+        req = urllib.request.Request(
+            config.OLLAMA_URL.rstrip("/") + path, data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                for line in resp:
+                    if line.strip():
+                        data = json.loads(line.decode("utf-8"))
+                        if "error" in data:
+                            raise JarvisError(f"Ollama-Fehler: {data['error']}")
+                        yield data
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "ignore")
+            if e.code == 404 and "not found" in detail:
+                raise JarvisError(f"Das Modell {config.OLLAMA_MODEL} fehlt. "
+                                  f"Bitte im Terminal 'ollama pull {config.OLLAMA_MODEL}' ausführen.")
+            raise JarvisError(f"Ollama-Fehler {e.code}: {detail[:200]}")
+        except urllib.error.URLError:
+            raise JarvisError("Ollama läuft nicht. Bitte die Ollama-App öffnen.")
+
+    def _body(self, messages, stream):
         body = {"model": config.OLLAMA_MODEL, "messages": messages, "tools": self.tools,
-                "stream": False, "keep_alive": config.OLLAMA_KEEP_ALIVE,
+                "stream": stream, "keep_alive": config.OLLAMA_KEEP_ALIVE,
                 "options": {"temperature": 0.6, "num_ctx": config.OLLAMA_CONTEXT, "num_predict": 300}}
         if self.think_supported:
             body["think"] = False  # schneller: kein langes «Nachdenken» vor der Antwort
+        return body
+
+    def _chat_streaming(self, messages, on_sentence):
+        """Streamt die Antwort und gibt jeden fertigen Satz sofort an on_sentence weiter."""
+        content, tool_calls, spoken = "", [], 0
         try:
-            return self.post("/api/chat", body)
+            for data in self.post_stream("/api/chat", self._body(messages, True)):
+                msg = data.get("message") or {}
+                if msg.get("tool_calls"):
+                    tool_calls.extend(msg["tool_calls"])
+                content += msg.get("content") or ""
+                if not tool_calls:
+                    spoken = _emit_sentences(content, spoken, on_sentence, final=False)
+                if data.get("done"):
+                    break
+        except JarvisError as e:
+            if self.think_supported and "think" in str(e).lower() and not content:
+                self.think_supported = False
+                return self._chat_streaming(messages, on_sentence)
+            raise
+        if not tool_calls:
+            _emit_sentences(content, spoken, on_sentence, final=True)
+        return {"role": "assistant", "content": content, "tool_calls": tool_calls}
+
+    def _chat(self, messages):
+        try:
+            return self.post("/api/chat", self._body(messages, False))
         except JarvisError as e:
             if self.think_supported and "think" in str(e).lower():
                 self.think_supported = False
@@ -138,11 +214,14 @@ class OllamaBrain(Brain):
         except Exception:
             pass  # Aufwärmen ist optional
 
-    def _run(self, messages, on_tool):
+    def _run(self, messages, on_tool, on_sentence=None):
         messages = [{"role": "system", "content": self.system_prompt()}] + messages
         reset, content = False, ""
         for _ in range(MAX_STEPS):
-            msg = self._chat(messages)["message"]
+            if on_sentence and self.post_stream:
+                msg = self._chat_streaming(messages, on_sentence)
+            else:
+                msg = self._chat(messages)["message"]
             messages.append(msg)
             content = re.sub(r"<think>.*?</think>", "", msg.get("content") or "", flags=re.S)
             calls = msg.get("tool_calls") or []
@@ -194,7 +273,7 @@ class ClaudeBrain(Brain):
         except self.anthropic.APIError as e:
             raise JarvisError(f"Da ist etwas schiefgelaufen: {getattr(e, 'message', e)}")
 
-    def _run(self, messages, on_tool):
+    def _run(self, messages, on_tool, on_sentence=None):
         reset, response = False, None
         for _ in range(MAX_STEPS):
             response = self._create(messages)

@@ -7,7 +7,7 @@ from pathlib import Path
 from . import config
 from .brain import JarvisError, create_brain
 from .main import is_exit, strip_wake_word
-from .voice import Listener, MicrophoneError, speak
+from .voice import Listener, MicrophoneError, SpeechQueue, speak
 
 UI_FILE = Path(__file__).parent / "ui" / "index.html"
 ICON_FILE = Path(__file__).resolve().parent.parent / "assets" / "icon.png"
@@ -22,6 +22,8 @@ class JarvisApp:
         self.lock = threading.Lock()   # immer nur eine Anfrage gleichzeitig
         self.running = True
         self._last_level = 0.0
+        self.speech = None if mute else SpeechQueue(
+            on_level=self.level, on_start=lambda: self.call("setState", "speaking"))
 
     # ---------- Python → HUD ----------
     def js(self, code: str):
@@ -61,14 +63,20 @@ class JarvisApp:
                 self.close()
                 return
             self.call("setState", "thinking")
+            streaming = self.speech is not None and self.brain.streams
             try:
-                answer = self.brain.ask(text, on_tool=lambda name, args: self.call("tool", name))
-                error = False
+                answer = self.brain.ask(text, on_tool=lambda name, args: self.call("tool", name),
+                                        on_sentence=self.speech.say if streaming else None)
+                error, spoken = False, streaming
             except JarvisError as e:
-                answer, error = str(e), True
+                answer, error, spoken = str(e), True, False
             if error:
                 self.call("setState", "error")
-            self.say(answer)
+            self.call("jarvis", answer)
+            if self.speech is not None:
+                if not spoken:
+                    self.speech.say(answer)
+                self.speech.wait()
             self.call("setState", "idle")
 
     def voice_loop(self):

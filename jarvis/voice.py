@@ -5,6 +5,7 @@ Beide Richtungen können einen Lautstärke-Pegel (0..1) melden – damit pulsier
 import asyncio
 import math
 import os
+import queue
 import random
 import re
 import subprocess
@@ -98,6 +99,36 @@ def speak(text: str, on_level=None):
                 print(f"⚠️  Neural-Stimme nicht verfügbar ({type(e).__name__}) – nutze Mac-Stimme.")
             _edge_failed = True
     _speak_mac(text, on_level)
+
+
+class SpeechQueue:
+    """Spricht Sätze der Reihe nach im Hintergrund – Jarvis kann schon reden, während er noch denkt."""
+
+    def __init__(self, on_level=None, on_start=None):
+        self.on_level = on_level
+        self.on_start = on_start
+        self._q = queue.Queue()
+        threading.Thread(target=self._worker, daemon=True).start()
+
+    def _worker(self):
+        while True:
+            text = self._q.get()
+            try:
+                if self.on_start:
+                    self.on_start()
+                speak(text, self.on_level)
+            except Exception as e:
+                print(f"⚠️  Sprachausgabe-Fehler: {e}")
+            finally:
+                self._q.task_done()
+
+    def say(self, text: str):
+        if text and text.strip():
+            self._q.put(text)
+
+    def wait(self):
+        """Blockiert, bis alles gesprochen ist."""
+        self._q.join()
 
 
 def rms_level(data: bytes, sample_width: int = 2) -> float:

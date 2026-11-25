@@ -5,7 +5,7 @@ import sys
 
 from . import config
 from .brain import JarvisError, create_brain
-from .voice import speak
+from .voice import SpeechQueue, speak
 
 CYAN, GREEN, GREY, RESET = "\033[96m", "\033[92m", "\033[90m", "\033[0m"
 EXIT_WORDS = {"tschüss", "tschüs", "ciao", "beenden", "exit", "quit", "auf wiedersehen", "gute nacht"}
@@ -25,14 +25,25 @@ def show_tool(name, args):
     print(f"{GREY}  ⚙  {name} {args if args else ''}{RESET}")
 
 
+_speech = None
+
+
 def respond(brain, text, mute):
+    global _speech
+    if not mute and _speech is None:
+        _speech = SpeechQueue()
+    streaming = not mute and brain.streams
     try:
-        answer = brain.ask(text, on_tool=show_tool)
+        # Mit Streaming spricht Jarvis jeden Satz, sobald er fertig ist
+        answer = brain.ask(text, on_tool=show_tool, on_sentence=_speech.say if streaming else None)
+        spoken = streaming
     except JarvisError as e:
-        answer = str(e)
+        answer, spoken = str(e), False
     print(f"{CYAN}Jarvis:{RESET} {answer}\n")
     if not mute:
-        speak(answer)
+        if not spoken:
+            _speech.say(answer)
+        _speech.wait()
 
 
 def is_exit(text):
