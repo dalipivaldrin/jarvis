@@ -3,3 +3,4 @@ python-dotenv>=1.0.0
 SpeechRecognition>=3.10.0
 PyAudio>=0.2.14
 edge-tts>=7.0.0
+pywebview>=5.0

@@ -162,7 +162,7 @@ class TestVoice(unittest.TestCase):
                 mock.patch.object(voice, "_speak_edge", return_value=True) as edge, \
                 mock.patch.object(voice, "_speak_mac") as mac:
             voice.speak("Hallo")
-        edge.assert_called_once_with("Hallo")
+        edge.assert_called_once_with("Hallo", None)
         mac.assert_not_called()
 
     def test_fallback_to_mac(self):
@@ -170,7 +170,7 @@ class TestVoice(unittest.TestCase):
                 mock.patch.object(voice, "_speak_edge", side_effect=OSError("offline")), \
                 mock.patch.object(voice, "_speak_mac") as mac:
             voice.speak("Hallo")
-        mac.assert_called_once_with("Hallo")
+        mac.assert_called_once_with("Hallo", None)
 
     def test_mac_mode(self):
         with mock.patch.object(voice.config, "TTS", "mac"), \
@@ -179,6 +179,69 @@ class TestVoice(unittest.TestCase):
             voice.speak("Hallo")
         edge.assert_not_called()
         mac.assert_called_once()
+
+
+class FakeWindow:
+    def __init__(self):
+        self.calls = []
+
+    def evaluate_js(self, code):
+        self.calls.append(code)
+
+
+class TestGui(unittest.TestCase):
+    def setUp(self):
+        memory.facts.save([]); memory.notes.save([]); memory.clear_history()
+
+    def make_app(self, replies):
+        from jarvis.gui import JarvisApp
+        win = FakeWindow()
+        app = JarvisApp(mute=True, use_mic=False, window=win, brain=OllamaBrain(post=FakeOllama(replies)))
+        return app, win
+
+    def test_text_request_updates_hud(self):
+        app, win = self.make_app([
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"function": {"name": "add_note", "arguments": {"text": "Test"}}}]},
+            {"role": "assistant", "content": "Notiert, Sir."},
+        ])
+        app.handle("Notiere Test")
+        js = "\n".join(win.calls)
+        self.assertIn('HUD.user("Notiere Test")', js)
+        self.assertIn('HUD.setState("thinking")', js)
+        self.assertIn('HUD.tool("add_note")', js)
+        self.assertIn('HUD.jarvis("Notiert, Sir.")', js)
+        self.assertTrue(win.calls[-1].endswith('HUD.setState("idle")'))
+
+    def test_error_state(self):
+        from jarvis.gui import JarvisApp
+
+        def broken(path, body):
+            raise JarvisError("Ollama läuft nicht.")
+        win = FakeWindow()
+        app = JarvisApp(mute=True, use_mic=False, window=win, brain=OllamaBrain(post=broken))
+        app.handle("Hallo")
+        self.assertIn('HUD.setState("error")', "\n".join(win.calls))
+
+    def test_level_throttled(self):
+        app, win = self.make_app([])
+        for _ in range(50):
+            app.level(0.5)
+        self.assertLess(len(win.calls), 5)
+
+
+class TestLevels(unittest.TestCase):
+    def test_word_level(self):
+        words = [(0.0, 0.4), (0.6, 0.3)]
+        self.assertGreater(voice.word_level(0.2, words), 0.9)
+        self.assertLess(voice.word_level(0.5, words), 0.2)
+
+    def test_rms_level(self):
+        import struct
+        silent = struct.pack("<100h", *([0] * 100))
+        loud = struct.pack("<100h", *([12000, -12000] * 50))
+        self.assertEqual(voice.rms_level(silent), 0.0)
+        self.assertGreater(voice.rms_level(loud), 0.9)
 
 
 class TestHelpers(unittest.TestCase):

@@ -103,7 +103,14 @@ def main():
     parser = argparse.ArgumentParser(description="Jarvis – dein persönlicher KI-Assistent")
     parser.add_argument("--text", action="store_true", help="Nur Texteingabe (kein Mikrofon)")
     parser.add_argument("--mute", action="store_true", help="Antworten nicht vorlesen")
+    parser.add_argument("--gui", action="store_true", help="Futuristisches HUD-Fenster statt Terminal")
     args = parser.parse_args()
+
+    if args.gui:
+        from .gui import run_gui
+
+        run_gui(mute=args.mute, use_mic=not args.text)
+        return
 
     print(BANNER)
     brain = create_brain()

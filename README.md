@@ -41,6 +41,8 @@ Mikrofon ──► Spracherkennung ──► Wake-Word-Filter
 | `jarvis/memory.py` | Fakten, Notizen und Verlauf in `~/.jarvis/` |
 | `jarvis/voice.py` | Spracherkennung und Sprachausgabe |
 | `jarvis/main.py` | Start, Sprach- und Textmodus |
+| `jarvis/gui.py` + `jarvis/ui/index.html` | HUD-Fenster (pywebview + animiertes Canvas) |
+| `install_app.sh` | Baut die macOS-App mit Symbol und Mikrofon-Berechtigung |
 
 ## Installation
 
@@ -60,6 +62,23 @@ Dann starten – im Textmodus oder mit Sprache:
 ```
 
 Namen und Wohnort passt du in der Datei `.env` an (`open -e .env`).
+
+### Als App mit futuristischem HUD starten
+
+![Jarvis HUD](assets/screenshot.png)
+
+```bash
+bash install_app.sh              # erstellt ~/Applications/Jarvis.app mit HUD-Fenster und eigenem Symbol
+bash install_app.sh --autostart  # zusätzlich: startet bei jeder Anmeldung
+bash install_app.sh --terminal   # alternativ: App startet Jarvis im Terminal
+```
+
+Danach Jarvis per Spotlight (Cmd+Leertaste → «Jarvis») oder über das Dock starten.
+Das HUD reagiert live: Ringe und Strahlen pulsieren mit deiner Stimme (Mikrofonpegel) und
+synchron zu Jarvis' Wörtern (Wortgrenzen der Neural-Stimme). Farben zeigen den Zustand:
+Cyan = bereit/spricht, Bernstein = verarbeitet, Rot = Fehler.
+
+Direkt aus dem Terminal: `./jarvis.sh --gui`
 
 ### Optional: Claude statt Ollama
 
