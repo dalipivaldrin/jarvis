@@ -14,6 +14,7 @@
 | 🧠 **Zwei Gehirne** | Ollama (kostenlos, privat, offline) oder Claude API (stärker, mit Websuche) |
 | 🌐 **Web & Infos** | Websuche (nur Claude), Wetter (Open-Meteo), Websites öffnen, Datum/Uhrzeit |
 | ⏰ **Erinnerungen** | Timer mit Mitteilung und Sprachausgabe, Einträge in der Apple-Erinnerungen-App |
+| 📱 **iMessage** | Schickt dir Infos und Erinnerungen aufs iPhone (nur an deine eigene Nummer) |
 | 📝 **Notizen** | Notizen speichern, auflisten, löschen |
 | 🧠 **Gedächtnis** | Merkt sich Fakten über dich und den Gesprächsverlauf – auch nach einem Neustart |
 
@@ -98,6 +99,8 @@ Für die Musik- und Erinnerungen-Steuerung fragt macOS ebenfalls einmal nach Erl
 - «Jarvis, notiere: Präsentation für Montag vorbereiten»
 - «Jarvis, merk dir, dass ich am liebsten Hip-Hop höre»
 - «Jarvis, was gibt es Neues in der Schweiz?»
+- «Jarvis, schick mir die Einkaufsliste aufs Handy»
+- «Jarvis, erinnere mich in einer Stunde per Nachricht ans Training»
 - «Jarvis, tschüss»
 
 ## Einstellungen (`.env`)
@@ -106,6 +109,7 @@ Für die Musik- und Erinnerungen-Steuerung fragt macOS ebenfalls einmal nach Erl
 |---|---|---|
 | `JARVIS_USER_NAME` | `Sir` | Wie Jarvis dich anspricht |
 | `JARVIS_CITY` | `Zürich` | Ort für das Wetter |
+| `JARVIS_PHONE` | – | Deine Handynummer/Apple-ID für iMessages von Jarvis |
 | `JARVIS_PROVIDER` | `ollama` | `ollama` (gratis) oder `claude` |
 | `JARVIS_OLLAMA_MODEL` | `qwen3:8b` | Ollama-Modell (muss Tool-Calling können); schneller: `qwen3:4b` |
 | `JARVIS_OLLAMA_KEEP_ALIVE` | `60m` | So lange bleibt das Modell geladen (schnelle Antworten) |
