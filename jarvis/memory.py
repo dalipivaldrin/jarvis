@@ -76,6 +76,7 @@ def list_notes() -> str:
 
 def delete_note(number: int) -> str:
     data = notes.load()
+    number = int(number)
     if not 1 <= number <= len(data):
         return f"Notiz Nr. {number} gibt es nicht."
     removed = data.pop(number - 1)

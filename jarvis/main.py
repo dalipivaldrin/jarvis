@@ -3,10 +3,8 @@ import argparse
 import re
 import sys
 
-import anthropic
-
 from . import config
-from .brain import Brain
+from .brain import JarvisError, create_brain
 from .voice import speak
 
 CYAN, GREEN, GREY, RESET = "\033[96m", "\033[92m", "\033[90m", "\033[0m"
@@ -30,12 +28,8 @@ def show_tool(name, args):
 def respond(brain, text, mute):
     try:
         answer = brain.ask(text, on_tool=show_tool)
-    except anthropic.AuthenticationError:
-        answer = "Mein API-Schlüssel ist ungültig. Bitte prüfe die .env-Datei."
-    except anthropic.APIConnectionError:
-        answer = "Ich habe gerade keine Verbindung zum Internet."
-    except anthropic.APIError as e:
-        answer = f"Da ist etwas schiefgelaufen: {e.message if hasattr(e, 'message') else e}"
+    except JarvisError as e:
+        answer = str(e)
     print(f"{CYAN}Jarvis:{RESET} {answer}\n")
     if not mute:
         speak(answer)
@@ -105,7 +99,9 @@ def main():
     args = parser.parse_args()
 
     print(BANNER)
-    brain = Brain()
+    brain = create_brain()
+    engine = f"Ollama ({config.OLLAMA_MODEL})" if config.PROVIDER != "claude" else f"Claude ({config.MODEL})"
+    print(f"{GREY}Gehirn: {engine}{RESET}")
     greeting = f"Willkommen zurück, {config.USER_NAME}. Alle Systeme bereit."
     print(f"{CYAN}Jarvis:{RESET} {greeting}\n")
     if not args.mute:

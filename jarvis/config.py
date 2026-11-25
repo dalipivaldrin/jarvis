@@ -7,7 +7,13 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# KI-Gehirn: "ollama" (gratis, lokal) oder "claude" (API-Key mit Guthaben nötig)
+PROVIDER = os.getenv("JARVIS_PROVIDER", "ollama").strip().lower()
+
+OLLAMA_MODEL = os.getenv("JARVIS_OLLAMA_MODEL", "qwen3:8b")
+OLLAMA_URL = os.getenv("JARVIS_OLLAMA_URL", "http://localhost:11434")
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 MODEL = os.getenv("JARVIS_MODEL", "claude-sonnet-5-5")
 
 USER_NAME = os.getenv("JARVIS_USER_NAME", "Sir")
