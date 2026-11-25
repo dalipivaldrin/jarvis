@@ -166,6 +166,63 @@ class TestOllama(unittest.TestCase):
         self.assertNotIn("think", calls[-1])
 
 
+class TestStreaming(unittest.TestCase):
+    def setUp(self):
+        memory.facts.save([]); memory.notes.save([]); memory.clear_history()
+
+    @staticmethod
+    def stream_of(*steps):
+        """Simuliert Ollama-Streaming: jede Anfrage liefert eine Liste von Chunks."""
+        steps = list(steps)
+        bodies = []
+
+        def post_stream(path, body):
+            bodies.append(body)
+            for chunk in steps.pop(0):
+                yield chunk
+        return post_stream, bodies
+
+    def test_sentences_spoken_while_generating(self):
+        chunks = [{"message": {"content": t}} for t in ["Guten ", "Abend, Sir. ", "Es ist ", "kalt draussen.", ""]]
+        chunks[-1]["done"] = True
+        post_stream, bodies = self.stream_of(chunks)
+        spoken = []
+        brain = OllamaBrain(post=lambda p, b: None, post_stream=post_stream)
+        answer = brain.ask("Wie ist es draussen?", on_sentence=spoken.append)
+        self.assertEqual(spoken, ["Guten Abend, Sir.", "Es ist kalt draussen."])
+        self.assertEqual(answer, "Guten Abend, Sir. Es ist kalt draussen.")
+        self.assertTrue(bodies[0]["stream"])
+
+    def test_tool_call_then_spoken_answer(self):
+        post_stream, bodies = self.stream_of(
+            [{"message": {"content": "", "tool_calls": [
+                {"function": {"name": "add_note", "arguments": {"text": "Milch"}}}]}, "done": True}],
+            [{"message": {"content": "Notiert."}, "done": True}],
+        )
+        spoken = []
+        OllamaBrain(post=lambda p, b: None, post_stream=post_stream).ask("Notiere Milch", on_sentence=spoken.append)
+        self.assertIn("Milch", memory.list_notes())
+        self.assertEqual(spoken, ["Notiert."])
+
+    def test_stable_system_prompt(self):
+        fake = FakeOllama([{"role": "assistant", "content": "Ok."}])
+        OllamaBrain(post=fake).ask("Hallo")
+        system = fake.bodies[0]["messages"][0]["content"]
+        user = next(m["content"] for m in reversed(fake.bodies[0]["messages"]) if m["role"] == "user")
+        import re
+        self.assertIsNone(re.search(r"\d{1,2}:\d{2}", system))  # keine Uhrzeit im Systemprompt → Cache bleibt gültig
+        self.assertTrue(user.startswith("[") and user.endswith("Hallo"))
+        self.assertEqual(memory.load_history()[0]["content"], "Hallo")  # Verlauf ohne Zeitstempel
+
+    def test_emit_ignores_think_and_numbers(self):
+        from jarvis.brain import _emit_sentences
+        out = []
+        n = _emit_sentences("<think>hmm. ok.</think>Es sind 3.5 Grad. Und", 0, out.append, final=False)
+        self.assertEqual(out, ["Es sind 3.5 Grad."])
+        _emit_sentences("<think>hmm. ok.</think>Es sind 3.5 Grad. Und windig", n, out.append, final=True)
+        self.assertEqual(out[-1], "Und windig")
+
+
 class TestVoice(unittest.TestCase):
     def test_edge_used_when_available(self):
         with mock.patch.object(voice.config, "TTS", "edge"), \
