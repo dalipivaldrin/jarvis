@@ -19,6 +19,8 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 MODEL = os.getenv("JARVIS_MODEL", "claude-sonnet-5-5")
 
 USER_NAME = os.getenv("JARVIS_USER_NAME", "Sir")
+# Deine iMessage-Adresse (Handynummer oder Apple-ID-E-Mail) – Jarvis schreibt nur an diese
+PHONE = os.getenv("JARVIS_PHONE", "").strip()
 CITY = os.getenv("JARVIS_CITY", "Zürich")
 
 LANGUAGE = os.getenv("JARVIS_LANGUAGE", "de-CH")   # Spracherkennung

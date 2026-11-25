@@ -145,22 +145,52 @@ def get_weather(city: str = "") -> str:
     return "\n".join(lines)
 
 
+# ---------- iMessage ----------
+def send_imessage(message: str) -> str:
+    """Schickt dem Nutzer selbst eine iMessage (nur an die eigene Nummer aus der .env)."""
+    if not config.PHONE:
+        return "Keine Handynummer hinterlegt. Bitte JARVIS_PHONE in der .env eintragen."
+    text, to = _esc(message), _esc(config.PHONE)
+    script = f'''tell application "Messages"
+    set svc to 1st account whose service type = iMessage
+    try
+        send "{text}" to participant "{to}" of svc
+    on error
+        send "{text}" to buddy "{to}" of svc
+    end try
+end tell'''
+    _osa(script)
+    return f"iMessage an {config.PHONE} gesendet."
+
+
+def _timer_done(message: str, imessage: bool):
+    notify("Jarvis", message)
+    if imessage:
+        try:
+            send_imessage(f"⏰ Jarvis: {message}")
+        except Exception as e:
+            print(f"⚠️  iMessage fehlgeschlagen: {e}")
+
+
 # ---------- Timer & Erinnerungen ----------
 _timers = []
 
 
-def set_timer(seconds: int, message: str = "Dein Timer ist abgelaufen.") -> str:
+def set_timer(seconds: int, message: str = "Dein Timer ist abgelaufen.", imessage: bool = False) -> str:
     seconds = int(seconds)
     if seconds <= 0:
         return "Die Dauer muss positiv sein."
-    t = threading.Timer(seconds, notify, args=("Jarvis", message))
+    if isinstance(imessage, str):
+        imessage = imessage.lower() == "true"
+    t = threading.Timer(seconds, _timer_done, args=(message, bool(imessage)))
     t.daemon = True
     t.start()
     _timers.append(t)
     mins, secs = divmod(seconds, 60)
     hrs, mins = divmod(mins, 60)
     parts = [f"{hrs} h" if hrs else "", f"{mins} min" if mins else "", f"{secs} s" if secs else ""]
-    return f"Timer gestellt: {' '.join(p for p in parts if p)} – «{message}»"
+    extra = " (kommt auch per iMessage)" if imessage else ""
+    return f"Timer gestellt: {' '.join(p for p in parts if p)} – «{message}»{extra}"
 
 
 def add_apple_reminder(title: str) -> str:
@@ -195,8 +225,13 @@ TOOL_SCHEMAS = [
           {"query": {"type": "string"}}, ["query"]),
     _tool("get_weather", "Aktuelles Wetter und 3-Tage-Prognose. Ohne Ort wird der Wohnort genommen.",
           {"city": {"type": "string"}}),
-    _tool("set_timer", "Stellt einen Timer bzw. eine Erinnerung in X Sekunden (Mitteilung + Sprachausgabe).",
-          {"seconds": {"type": "integer"}, "message": {"type": "string"}}, ["seconds"]),
+    _tool("set_timer", "Stellt einen Timer bzw. eine Erinnerung in X Sekunden (Mitteilung + Sprachausgabe). "
+          "imessage=true, wenn er die Erinnerung aufs Handy will (z.B. weil er unterwegs ist).",
+          {"seconds": {"type": "integer"}, "message": {"type": "string"},
+           "imessage": {"type": "boolean", "default": False}}, ["seconds"]),
+    _tool("send_imessage", "Schickt dem Nutzer SELBST eine iMessage aufs Handy (z.B. Infos, Listen, Erinnerungen). "
+          "Kann nur an seine eigene Nummer schreiben, nicht an andere Personen.",
+          {"message": {"type": "string"}}, ["message"]),
     _tool("add_apple_reminder", "Legt einen Eintrag in der Apple-Erinnerungen-App an (To-do ohne Uhrzeit).",
           {"title": {"type": "string"}}, ["title"]),
     _tool("add_note", "Speichert eine Notiz.", {"text": {"type": "string"}}, ["text"]),
@@ -214,7 +249,7 @@ _HANDLERS = {
     "open_app": open_app, "quit_app": quit_app, "set_volume": set_volume, "get_volume": get_volume,
     "media_control": media_control, "lock_screen": lock_screen, "battery_status": battery_status,
     "get_datetime": get_datetime, "open_url": open_url, "search_in_browser": search_in_browser,
-    "get_weather": get_weather, "set_timer": set_timer, "add_apple_reminder": add_apple_reminder,
+    "get_weather": get_weather, "set_timer": set_timer, "send_imessage": send_imessage, "add_apple_reminder": add_apple_reminder,
     "add_note": memory.add_note, "list_notes": memory.list_notes, "delete_note": memory.delete_note,
     "remember_fact": memory.remember, "forget_fact": memory.forget,
 }
