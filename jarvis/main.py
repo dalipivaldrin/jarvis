@@ -114,6 +114,9 @@ def main():
 
     print(BANNER)
     brain = create_brain()
+    import threading
+
+    threading.Thread(target=brain.warmup, daemon=True).start()  # Modell laden, während Jarvis begrüsst
     engine = f"Ollama ({config.OLLAMA_MODEL})" if config.PROVIDER != "claude" else f"Claude ({config.MODEL})"
     print(f"{GREY}Gehirn: {engine}{RESET}")
     greeting = f"Willkommen zurück, {config.USER_NAME}. Alle Systeme bereit."

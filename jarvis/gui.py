@@ -127,6 +127,7 @@ class Api:
 
 
 def _on_ready(app: JarvisApp):
+    threading.Thread(target=app.brain.warmup, daemon=True).start()  # Modell laden, während Jarvis begrüsst
     engine = f"OLLAMA · {config.OLLAMA_MODEL}" if config.PROVIDER != "claude" else f"CLAUDE · {config.MODEL}"
     voice = config.EDGE_VOICE.replace("Neural", "") if config.TTS == "edge" else config.VOICE
     app.call("info", {"core": engine.upper(), "voice": voice.upper(), "mic": "START…" if app.use_mic else "AUS"})

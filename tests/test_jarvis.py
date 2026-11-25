@@ -143,6 +143,16 @@ class TestOllama(unittest.TestCase):
         OllamaBrain(post=fake).ask("Lösche Notiz 1")
         self.assertEqual(memory.list_notes(), "Keine Notizen vorhanden.")
 
+    def test_speed_options_and_warmup(self):
+        fake = FakeOllama([{"role": "assistant", "content": "x"}, {"role": "assistant", "content": "Hallo."}])
+        brain = OllamaBrain(post=fake)
+        brain.warmup()
+        self.assertEqual(fake.bodies[0]["options"]["num_predict"], 1)
+        brain.ask("Hi")
+        body = fake.bodies[1]
+        self.assertIn("keep_alive", body)
+        self.assertEqual(body["options"]["num_ctx"], 4096)
+
     def test_think_fallback(self):
         calls = []
 

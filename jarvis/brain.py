@@ -19,6 +19,9 @@ class Brain:
 
     web_search = False
 
+    def warmup(self):
+        """Optional: Modell vorladen (nur bei Ollama nötig)."""
+
     def __init__(self):
         self.history = memory.load_history()
 
@@ -109,7 +112,8 @@ class OllamaBrain(Brain):
 
     def _chat(self, messages):
         body = {"model": config.OLLAMA_MODEL, "messages": messages, "tools": self.tools,
-                "stream": False, "options": {"temperature": 0.6}}
+                "stream": False, "keep_alive": config.OLLAMA_KEEP_ALIVE,
+                "options": {"temperature": 0.6, "num_ctx": config.OLLAMA_CONTEXT, "num_predict": 300}}
         if self.think_supported:
             body["think"] = False  # schneller: kein langes «Nachdenken» vor der Antwort
         try:
@@ -119,6 +123,19 @@ class OllamaBrain(Brain):
                 self.think_supported = False
                 return self._chat(messages)
             raise
+
+    def warmup(self):
+        """Lädt das Modell beim Start schon in den Speicher – die erste Antwort kommt dann viel schneller."""
+        try:
+            body_messages = [{"role": "system", "content": self.system_prompt()}, {"role": "user", "content": "Hallo"}]
+            body = {"model": config.OLLAMA_MODEL, "messages": body_messages, "tools": self.tools,
+                    "stream": False, "keep_alive": config.OLLAMA_KEEP_ALIVE,
+                    "options": {"num_ctx": config.OLLAMA_CONTEXT, "num_predict": 1}}
+            if self.think_supported:
+                body["think"] = False
+            self.post("/api/chat", body)
+        except Exception:
+            pass  # Aufwärmen ist optional
 
     def _run(self, messages, on_tool):
         messages = [{"role": "system", "content": self.system_prompt()}] + messages

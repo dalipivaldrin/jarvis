@@ -107,7 +107,8 @@ Für die Musik- und Erinnerungen-Steuerung fragt macOS ebenfalls einmal nach Erl
 | `JARVIS_USER_NAME` | `Sir` | Wie Jarvis dich anspricht |
 | `JARVIS_CITY` | `Zürich` | Ort für das Wetter |
 | `JARVIS_PROVIDER` | `ollama` | `ollama` (gratis) oder `claude` |
-| `JARVIS_OLLAMA_MODEL` | `qwen3:8b` | Ollama-Modell (muss Tool-Calling können) |
+| `JARVIS_OLLAMA_MODEL` | `qwen3:8b` | Ollama-Modell (muss Tool-Calling können); schneller: `qwen3:4b` |
+| `JARVIS_OLLAMA_KEEP_ALIVE` | `60m` | So lange bleibt das Modell geladen (schnelle Antworten) |
 | `ANTHROPIC_API_KEY` | – | Nur für Claude |
 | `JARVIS_MODEL` | `claude-sonnet-5-5` | Claude-Modell |
 | `JARVIS_LANGUAGE` | `de-CH` | Sprache der Spracherkennung |

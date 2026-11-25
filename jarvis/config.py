@@ -12,6 +12,8 @@ PROVIDER = os.getenv("JARVIS_PROVIDER", "ollama").strip().lower()
 
 OLLAMA_MODEL = os.getenv("JARVIS_OLLAMA_MODEL", "qwen3:8b")
 OLLAMA_URL = os.getenv("JARVIS_OLLAMA_URL", "http://localhost:11434")
+OLLAMA_KEEP_ALIVE = os.getenv("JARVIS_OLLAMA_KEEP_ALIVE", "60m")  # Modell so lange im Speicher halten
+OLLAMA_CONTEXT = int(os.getenv("JARVIS_OLLAMA_CONTEXT", "4096"))    # kleiner = schneller
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 MODEL = os.getenv("JARVIS_MODEL", "claude-sonnet-5-5")
@@ -30,7 +32,7 @@ EDGE_PITCH = os.getenv("JARVIS_EDGE_PITCH", "+0Hz")  # Tonhöhe, z.B. -5Hz für 
 WAKE_WORD = os.getenv("JARVIS_WAKE_WORD", "jarvis").lower()
 
 WEB_SEARCH = os.getenv("JARVIS_WEB_SEARCH", "true").lower() == "true"
-MAX_HISTORY = int(os.getenv("JARVIS_MAX_HISTORY", "20"))  # Nachrichten im Kurzzeitgedächtnis
+MAX_HISTORY = int(os.getenv("JARVIS_MAX_HISTORY", "10"))  # Nachrichten im Kurzzeitgedächtnis
 
 DATA_DIR = Path(os.getenv("JARVIS_DATA_DIR", str(Path.home() / ".jarvis"))).expanduser()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
