@@ -8,9 +8,11 @@ os.environ["JARVIS_DATA_DIR"] = tempfile.mkdtemp()
 os.environ.setdefault("ANTHROPIC_API_KEY", "test")
 
 from jarvis import memory, main  # noqa: E402
-from jarvis.brain import Brain  # noqa: E402
+from jarvis.brain import ClaudeBrain as Brain, JarvisError, OllamaBrain  # noqa: E402
 from jarvis.tools import TOOL_SCHEMAS, _HANDLERS, run_tool  # noqa: E402
+from jarvis import voice  # noqa: E402
 from jarvis.voice import clean_for_speech  # noqa: E402
+from unittest import mock  # noqa: E402
 
 
 class FakeClient:
@@ -99,6 +101,84 @@ class TestBrain(unittest.TestCase):
         brain.ask("Hi")
         brain.ask("Vergiss unser Gespräch")
         self.assertEqual(memory.load_history(), [])
+
+
+class FakeOllama:
+    """Simuliert die Ollama-API."""
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.bodies = []
+
+    def __call__(self, path, body):
+        self.bodies.append(body)
+        return {"message": self.replies.pop(0)}
+
+
+class TestOllama(unittest.TestCase):
+    def setUp(self):
+        memory.facts.save([]); memory.notes.save([]); memory.clear_history()
+
+    def test_tool_loop(self):
+        fake = FakeOllama([
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"function": {"name": "add_note", "arguments": {"text": "Einkaufen"}}}]},
+            {"role": "assistant", "content": "<think>hmm</think>Notiert."},
+        ])
+        brain = OllamaBrain(post=fake)
+        self.assertEqual(brain.ask("Notiere Einkaufen"), "Notiert.")
+        self.assertIn("Einkaufen", memory.list_notes())
+        tool_msg = fake.bodies[1]["messages"][-2]  # [-1] ist die spätere Antwort
+        self.assertEqual(tool_msg["role"], "tool")
+        self.assertEqual(fake.bodies[0]["messages"][0]["role"], "system")
+        self.assertEqual(fake.bodies[0]["tools"][0]["type"], "function")
+
+    def test_string_arguments(self):
+        memory.add_note("A")
+        fake = FakeOllama([
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"function": {"name": "delete_note", "arguments": '{"number": "1"}'}}]},
+            {"role": "assistant", "content": "Gelöscht."},
+        ])
+        OllamaBrain(post=fake).ask("Lösche Notiz 1")
+        self.assertEqual(memory.list_notes(), "Keine Notizen vorhanden.")
+
+    def test_think_fallback(self):
+        calls = []
+
+        def post(path, body):
+            calls.append(dict(body))
+            if "think" in body:
+                raise JarvisError('Ollama-Fehler 400: "model does not support thinking"')
+            return {"message": {"role": "assistant", "content": "Hallo."}}
+
+        self.assertEqual(OllamaBrain(post=post).ask("Hi"), "Hallo.")
+        self.assertNotIn("think", calls[-1])
+
+
+class TestVoice(unittest.TestCase):
+    def test_edge_used_when_available(self):
+        with mock.patch.object(voice.config, "TTS", "edge"), \
+                mock.patch.object(voice, "_speak_edge", return_value=True) as edge, \
+                mock.patch.object(voice, "_speak_mac") as mac:
+            voice.speak("Hallo")
+        edge.assert_called_once_with("Hallo")
+        mac.assert_not_called()
+
+    def test_fallback_to_mac(self):
+        with mock.patch.object(voice.config, "TTS", "edge"), \
+                mock.patch.object(voice, "_speak_edge", side_effect=OSError("offline")), \
+                mock.patch.object(voice, "_speak_mac") as mac:
+            voice.speak("Hallo")
+        mac.assert_called_once_with("Hallo")
+
+    def test_mac_mode(self):
+        with mock.patch.object(voice.config, "TTS", "mac"), \
+                mock.patch.object(voice, "_speak_edge") as edge, \
+                mock.patch.object(voice, "_speak_mac") as mac:
+            voice.speak("Hallo")
+        edge.assert_not_called()
+        mac.assert_called_once()
 
 
 class TestHelpers(unittest.TestCase):

@@ -8,7 +8,7 @@
 
 | Bereich | Was Jarvis kann |
 |---|---|
-| 🎙️ **Sprache** | Wake-Word «Jarvis», Spracherkennung (Schweizerdeutsch/Deutsch), Antworten per Sprachausgabe |
+| 🎙️ **Sprache** | Wake-Word «Jarvis», Spracherkennung (Schweizerdeutsch/Deutsch), menschlich klingende Neural-Stimme (Microsoft Edge TTS, gratis) |
 | ⌨️ **Text** | Chat im Terminal, falls kein Mikrofon gewünscht |
 | 💻 **Mac steuern** | Apps öffnen/beenden, Lautstärke, Spotify/Apple Music, Bildschirm sperren, Akkustand |
 | 🧠 **Zwei Gehirne** | Ollama (kostenlos, privat, offline) oder Claude API (stärker, mit Websuche) |
@@ -31,7 +31,7 @@ Mikrofon ──► Spracherkennung ──► Wake-Word-Filter
                      Mac-Werkzeuge (AppleScript, open, pmset, …)
                                       │
                                       ▼
-                         Antwort ──► Sprachausgabe (say)
+                         Antwort ──► Neural-Stimme (edge-tts) / say
 ```
 
 | Datei | Aufgabe |
@@ -92,7 +92,10 @@ Für die Musik- und Erinnerungen-Steuerung fragt macOS ebenfalls einmal nach Erl
 | `ANTHROPIC_API_KEY` | – | Nur für Claude |
 | `JARVIS_MODEL` | `claude-sonnet-5-5` | Claude-Modell |
 | `JARVIS_LANGUAGE` | `de-CH` | Sprache der Spracherkennung |
-| `JARVIS_VOICE` | `Anna` | macOS-Stimme (Liste: `say -v '?'`) |
+| `JARVIS_TTS` | `edge` | `edge` (menschliche Neural-Stimme, Internet) oder `mac` (offline) |
+| `JARVIS_EDGE_VOICE` | `de-CH-JanNeural` | Neural-Stimme, z.B. `de-DE-ConradNeural`, `de-DE-KillianNeural`, `de-CH-LeniNeural` |
+| `JARVIS_EDGE_RATE` | `+0%` | Sprechtempo, z.B. `+10%` |
+| `JARVIS_VOICE` | `Anna` | macOS-Stimme als Ersatz ohne Internet (Liste: `say -v '?'`) |
 | `JARVIS_WAKE_WORD` | `jarvis` | Aktivierungswort |
 | `JARVIS_WEB_SEARCH` | `true` | Websuche (nur Claude) |
 

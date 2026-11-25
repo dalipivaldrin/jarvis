@@ -49,7 +49,9 @@ def notify(title: str, message: str, speak: bool = True):
         pass
     print(f"\n🔔 {title}: {message}")
     if speak:
-        subprocess.run(["say", "-v", config.VOICE, message], capture_output=True)
+        from .voice import speak as say_aloud
+
+        say_aloud(message)
 
 
 # ---------- Mac steuern ----------

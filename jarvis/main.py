@@ -60,13 +60,17 @@ def strip_wake_word(text):
     return match.group(1).strip() if match else None
 
 
+MIC_HELP = ("⚠️  Kein Zugriff aufs Mikrofon. Erlauben unter: Systemeinstellungen → Datenschutz & Sicherheit "
+            "→ Mikrofon → Terminal einschalten, dann Terminal mit Cmd+Q neu starten.\n   Wechsle in den Textmodus.")
+
+
 def voice_loop(brain, mute):
-    from .voice import Listener
+    from .voice import Listener, MicrophoneError
 
     try:
         listener = Listener()
-    except Exception as e:
-        print(f"⚠️  Mikrofon nicht verfügbar ({e}). Wechsle in den Textmodus.")
+    except Exception:
+        print(MIC_HELP)
         return text_loop(brain, mute)
 
     print(f"{GREY}Sprachmodus – sag «{config.WAKE_WORD.capitalize()}, ...». Ctrl+C zum Beenden.{RESET}\n")
@@ -88,6 +92,9 @@ def voice_loop(brain, mute):
             if is_exit(command):
                 break
             respond(brain, command, mute)
+    except MicrophoneError:
+        print(MIC_HELP)
+        return text_loop(brain, mute)
     except KeyboardInterrupt:
         print()
 

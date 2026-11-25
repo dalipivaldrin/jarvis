@@ -20,7 +20,13 @@ USER_NAME = os.getenv("JARVIS_USER_NAME", "Sir")
 CITY = os.getenv("JARVIS_CITY", "Zürich")
 
 LANGUAGE = os.getenv("JARVIS_LANGUAGE", "de-CH")   # Spracherkennung
-VOICE = os.getenv("JARVIS_VOICE", "Anna")          # macOS-Stimme (say -v '?')
+VOICE = os.getenv("JARVIS_VOICE", "Anna")          # macOS-Stimme (say -v '?'), auch Ersatz ohne Internet
+
+# Sprachausgabe: "edge" (menschliche Neural-Stimme, gratis, Internet nötig) oder "mac" (offline)
+TTS = os.getenv("JARVIS_TTS", "edge").strip().lower()
+EDGE_VOICE = os.getenv("JARVIS_EDGE_VOICE", "de-CH-JanNeural")
+EDGE_RATE = os.getenv("JARVIS_EDGE_RATE", "+0%")    # Tempo, z.B. +10% oder -10%
+EDGE_PITCH = os.getenv("JARVIS_EDGE_PITCH", "+0Hz")  # Tonhöhe, z.B. -5Hz für tiefer
 WAKE_WORD = os.getenv("JARVIS_WAKE_WORD", "jarvis").lower()
 
 WEB_SEARCH = os.getenv("JARVIS_WEB_SEARCH", "true").lower() == "true"
