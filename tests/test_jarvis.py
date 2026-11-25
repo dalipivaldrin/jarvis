@@ -240,6 +240,31 @@ class TestGui(unittest.TestCase):
         self.assertLess(len(win.calls), 5)
 
 
+class TestIMessage(unittest.TestCase):
+    def test_requires_phone(self):
+        from jarvis import tools
+        with mock.patch.object(tools.config, "PHONE", ""):
+            self.assertIn("JARVIS_PHONE", tools.send_imessage("Hallo"))
+
+    def test_sends_only_to_own_number(self):
+        from jarvis import tools
+        with mock.patch.object(tools.config, "PHONE", "+41790000000"), \
+                mock.patch.object(tools, "_osa") as osa:
+            result = tools.send_imessage('Sag "Hallo"')
+        script = osa.call_args[0][0]
+        self.assertIn('participant "+41790000000"', script)
+        self.assertIn('Sag \\"Hallo\\"', script)   # Anführungszeichen sicher maskiert
+        self.assertIn("gesendet", result)
+
+    def test_timer_with_imessage(self):
+        from jarvis import tools
+        with mock.patch.object(tools, "notify"), mock.patch.object(tools, "send_imessage") as send:
+            tools._timer_done("Wäsche", True)
+        send.assert_called_once()
+        self.assertIn("(kommt auch per iMessage)", tools.set_timer(3600, "Test", "true"))
+        tools._timers[-1].cancel()
+
+
 class TestLevels(unittest.TestCase):
     def test_word_level(self):
         words = [(0.0, 0.4), (0.6, 0.3)]
